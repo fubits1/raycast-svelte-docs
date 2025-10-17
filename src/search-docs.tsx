@@ -196,7 +196,8 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
   const [isLoading, setIsLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
   const [hasInitialQuery] = useState(!!args.query);
-  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
   // Fetch docs
   const {
@@ -279,16 +280,17 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
       return scoreB - scoreA; // Higher scores first
     });
 
-  // Auto-select first result when search results change
+  // Auto-select first result when search results change (only once per search)
   useEffect(() => {
-    if (filteredSections.length > 0) {
-      const firstItemId = filteredSections[0].title;
-      setSelectedItemId(firstItemId);
+    if (filteredSections.length > 0 && !hasAutoSelected) {
+      setSelectedItemId('0');
       setShowDetail(true); // Auto-show detail view
-    } else {
-      setSelectedItemId(undefined);
+      setHasAutoSelected(true);
+    } else if (filteredSections.length === 0) {
+      setSelectedItemId('');
+      setHasAutoSelected(false);
     }
-  }, [filteredSections]);
+  }, [filteredSections, hasAutoSelected]);
 
   return (
     <List
@@ -299,17 +301,18 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
           return;
         }
         setSearchText(text);
+        setHasAutoSelected(false); // Reset auto-selection for new search
       }}
       searchBarPlaceholder="Search Svelte documentation..."
       isShowingDetail={showDetail}
       selectedItemId={selectedItemId}
-      onSelectionChange={(id) => setSelectedItemId(id || undefined)}
+      onSelectionChange={(id) => setSelectedItemId(id || '')}
       throttle
     >
       {filteredSections.map((section, index) => (
         <List.Item
           key={index}
-          id={section.title}
+          id={index.toString()}
           title={section.title}
           subtitle={section.type}
           icon={{ source: getIcon(section.type), tintColor: getColor(section.type) }}
