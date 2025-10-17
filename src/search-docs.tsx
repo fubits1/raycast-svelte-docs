@@ -15,6 +15,18 @@ interface Arguments {
 
 const DOCS_URL = 'https://svelte.dev/llms-full.txt';
 const cache = new Cache();
+const CACHE_KEY = 'svelte-docs';
+const CACHE_EXPIRY_KEY = 'svelte-docs-expiry';
+const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour
+
+function isCacheValid(): boolean {
+  const cached = cache.get(CACHE_KEY);
+  const expiry = cache.get(CACHE_EXPIRY_KEY);
+
+  if (!cached || !expiry) return false;
+
+  return Date.now() < parseInt(expiry);
+}
 
 interface DocSection {
   title: string;
@@ -177,7 +189,7 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
     isLoading: isFetching,
     error,
   } = useFetch(DOCS_URL, {
-    execute: !cache.has('svelte-docs'),
+    execute: !isCacheValid(),
     onError: (error) => {
       showToast({
         style: Toast.Style.Failure,
@@ -194,13 +206,13 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
       try {
         let docsText: string;
 
-        // Try to load from cache first
-        const cached = cache.get('svelte-docs');
-        if (cached) {
-          docsText = cached;
+        // Try cache first
+        if (isCacheValid()) {
+          docsText = cache.get(CACHE_KEY)!;
         } else if (data) {
           docsText = String(data);
-          cache.set('svelte-docs', docsText);
+          cache.set(CACHE_KEY, docsText);
+          cache.set(CACHE_EXPIRY_KEY, (Date.now() + CACHE_DURATION).toString());
         } else {
           setIsLoading(false);
           return;
@@ -291,19 +303,6 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
                 title="Copy URL"
                 content={section.url}
                 shortcut={{ modifiers: ['cmd', 'shift'], key: 'c' }}
-              />
-              <Action
-                title="Clear Cache"
-                icon={Icon.Trash}
-                shortcut={{ modifiers: ['cmd', 'shift'], key: 'r' }}
-                onAction={() => {
-                  cache.remove('svelte-docs');
-                  showToast({
-                    style: Toast.Style.Success,
-                    title: 'Cache cleared',
-                    message: 'Docs will be refetched on next load',
-                  });
-                }}
               />
             </ActionPanel>
           }
