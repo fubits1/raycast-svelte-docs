@@ -1,8 +1,8 @@
-import { ActionPanel, Action, List, showToast, Toast, Cache, Icon, Color } from '@raycast/api';
-import React, { useState, useEffect } from 'react';
+import { Action, ActionPanel, Cache, Color, Icon, List, showToast, Toast } from '@raycast/api';
 import { useFetch } from '@raycast/utils';
-import { marked } from 'marked';
 import Fuse from 'fuse.js';
+import { marked } from 'marked';
+import { useEffect, useState } from 'react';
 
 // Enable GFM support
 marked.use({
@@ -103,22 +103,6 @@ function detectType(title: string): DocSection['type'] {
   }
 
   return 'concept';
-}
-
-function generateUrl(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-
-  if (title.includes('$app')) {
-    return `https://svelte.dev/docs/kit/${slug}`;
-  }
-  if (title.includes('@sveltejs')) {
-    return `https://svelte.dev/docs/kit/${slug}`;
-  }
-
-  return `https://svelte.dev/docs/kit/${slug}`;
 }
 
 function extractKeywords(title: string): string[] {
