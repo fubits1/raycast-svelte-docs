@@ -3,6 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useFetch } from '@raycast/utils';
 import { marked } from 'marked';
 
+// Enable GFM support
+marked.use({
+  gfm: true,
+});
+
 interface Arguments {
   query?: string;
 }
@@ -20,16 +25,15 @@ interface DocSection {
 
 function parseDocsText(text: string): DocSection[] {
   const sections: DocSection[] = [];
-  const lines = text.split('\n');
+
+  // Use marked to parse the markdown and extract headers
+  const tokens = marked.lexer(text);
 
   let currentSection: Partial<DocSection> | null = null;
   let contentBuffer: string[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Detect section headers (markdown headers)
-    if (line.startsWith('# ') && !line.includes('@sveltejs')) {
+  for (const token of tokens) {
+    if (token.type === 'heading' && token.depth <= 3) {
       // Save previous section
       if (currentSection && currentSection.title && contentBuffer.length > 0) {
         currentSection.content = contentBuffer.join('\n').trim();
@@ -37,25 +41,7 @@ function parseDocsText(text: string): DocSection[] {
       }
 
       // Start new section
-      const title = line.substring(2).trim();
-      contentBuffer = [];
-
-      currentSection = {
-        title,
-        content: '',
-        type: detectType(title),
-        url: generateUrl(title),
-        keywords: extractKeywords(title),
-      };
-    } else if (line.startsWith('## ') || line.startsWith('### ')) {
-      // Subsections - save as separate entries for better searchability
-      if (currentSection && currentSection.title && contentBuffer.length > 0) {
-        currentSection.content = contentBuffer.join('\n').trim();
-        sections.push(currentSection as DocSection);
-      }
-
-      const level = line.startsWith('## ') ? 2 : 3;
-      const title = line.substring(level + 1).trim();
+      const title = token.text;
       contentBuffer = [];
 
       currentSection = {
@@ -66,8 +52,21 @@ function parseDocsText(text: string): DocSection[] {
         keywords: extractKeywords(title),
       };
     } else if (currentSection) {
-      // Add raw markdown content to preserve formatting
-      contentBuffer.push(line);
+      // Add content to current section
+      if (token.type === 'paragraph') {
+        contentBuffer.push(token.text);
+      } else if (token.type === 'code') {
+        contentBuffer.push(`\`\`\`${token.lang || ''}\n${token.text}\n\`\`\``);
+      } else if (token.type === 'list') {
+        const listItems = token.items.map((item: any) => `- ${item.text}`).join('\n');
+        contentBuffer.push(listItems);
+      } else if (token.type === 'table') {
+        // Handle tables with GFM support
+        const tableMarkdown = marked.parser([token]);
+        contentBuffer.push(tableMarkdown);
+      } else if (token.type === 'blockquote') {
+        contentBuffer.push(`> ${token.text}`);
+      }
     }
   }
 
