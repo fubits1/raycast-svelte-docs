@@ -128,7 +128,7 @@ function getIcon(type: DocSection['type']): Icon {
   switch (type) {
     case 'module':
       return Icon.Box;
-    case 'function':
+    case 'keyword':
       return Icon.Code;
     case 'component':
       return Icon.Layers;
@@ -145,7 +145,7 @@ function getColor(type: DocSection['type']): Color {
   switch (type) {
     case 'module':
       return Color.Blue;
-    case 'function':
+    case 'keyword':
       return Color.Purple;
     case 'component':
       return Color.Orange;
