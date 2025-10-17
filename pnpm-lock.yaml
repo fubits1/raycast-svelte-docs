@@ -14,6 +14,9 @@ importers:
       '@raycast/utils':
         specifier: ^1.17.0
         version: 1.19.1(@raycast/api@1.103.3(@types/node@20.8.10)(@types/react@18.3.3))
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
       marked:
         specifier: ^12.0.0
         version: 12.0.2
@@ -767,6 +770,10 @@ packages:
 
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
+
+  fuse.js@7.1.0:
+    resolution: {integrity: sha512-trLf4SzuuUxfusZADLINj+dE8clK1frKdmqiJNb1Es75fmI5oY6X2mxLVUciLLjxqw/xr72Dhy+lER6dGd02FQ==}
+    engines: {node: '>=10'}
 
   get-package-type@0.1.0:
     resolution: {integrity: sha512-pjzuKtY64GYfWizNAJ0fr9VqttZkNiK2iS430LtIHzjBEr6bX8Am2zm4sW4Ro5wjWW5cAlRL1qAMTcXbjNAO2Q==}
@@ -1931,6 +1938,8 @@ snapshots:
   flatted@3.3.3: {}
 
   fs.realpath@1.0.0: {}
+
+  fuse.js@7.1.0: {}
 
   get-package-type@0.1.0: {}
 

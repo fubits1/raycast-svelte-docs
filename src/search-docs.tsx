@@ -2,6 +2,7 @@ import { ActionPanel, Action, List, showToast, Toast, Cache, Icon, Color } from 
 import React, { useState, useEffect } from 'react';
 import { useFetch } from '@raycast/utils';
 import { marked } from 'marked';
+import Fuse from 'fuse.js';
 
 // Enable GFM support
 marked.use({
@@ -158,36 +159,21 @@ function getColor(type: DocSection['type']): Color {
   }
 }
 
-function getMatchScore(section: DocSection, search: string): number {
-  let score = 0;
-
-  // Exact keyword match gets highest priority
-  if (section.keywords.some((k) => k === search)) {
-    score += 100;
-  }
-
-  // Keyword contains search gets high priority
-  if (section.keywords.some((k) => k.includes(search))) {
-    score += 50;
-  }
-
-  // Title exact match gets medium-high priority
-  if (section.title.toLowerCase() === search) {
-    score += 30;
-  }
-
-  // Title contains search gets medium priority
-  if (section.title.toLowerCase().includes(search)) {
-    score += 20;
-  }
-
-  // Content contains search gets low priority
-  if (section.content.toLowerCase().includes(search)) {
-    score += 10;
-  }
-
-  return score;
-}
+// Fuse.js configuration for fuzzy search
+const fuseOptions = {
+  keys: [
+    { name: 'keywords', weight: 0.4 },
+    { name: 'title', weight: 0.3 },
+    { name: 'content', weight: 0.2 },
+    { name: 'type', weight: 0.1 },
+  ],
+  threshold: 0.4, // Lower = more strict matching
+  includeScore: true,
+  includeMatches: true,
+  minMatchCharLength: 2,
+  ignoreLocation: true,
+  findAllMatches: true,
+};
 
 export default function Command({ arguments: args }: { arguments: Arguments }) {
   const [searchText, setSearchText] = useState(args.query || '');
@@ -255,29 +241,12 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
     loadDocs();
   }, [data]);
 
-  // Filter and sort sections based on search
-  const filteredSections = sections
-    .filter((section) => {
-      if (!searchText) return true;
+  // Use Fuse.js for fuzzy search
+  const fuse = new Fuse(sections, fuseOptions);
 
-      const search = searchText.toLowerCase();
-      return (
-        section.title.toLowerCase().includes(search) ||
-        section.keywords.some((k) => k.includes(search)) ||
-        section.content.toLowerCase().includes(search)
-      );
-    })
-    .sort((a, b) => {
-      if (!searchText) return 0;
-
-      const search = searchText.toLowerCase();
-
-      // Score each section based on match type
-      const scoreA = getMatchScore(a, search);
-      const scoreB = getMatchScore(b, search);
-
-      return scoreB - scoreA; // Higher scores first
-    });
+  const filteredSections = searchText
+    ? fuse.search(searchText).map((result) => result.item)
+    : sections;
 
   // Auto-select first result when search results change (only once per search)
   useEffect(() => {
