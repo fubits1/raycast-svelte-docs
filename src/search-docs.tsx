@@ -18,7 +18,7 @@ const cache = new Cache();
 interface DocSection {
   title: string;
   content: string;
-  type: 'module' | 'function' | 'component' | 'concept' | 'config' | 'hook';
+  type: 'module' | 'keyword' | 'component' | 'concept' | 'config' | 'hook';
   url: string;
   keywords: string[];
 }
@@ -86,7 +86,7 @@ function detectType(title: string): DocSection['type'] {
     return 'module';
   }
   if (lower.match(/^[a-z]+$/)) {
-    return 'function';
+    return 'keyword';
   }
   if (lower.includes('component') || lower.includes('element')) {
     return 'component';
