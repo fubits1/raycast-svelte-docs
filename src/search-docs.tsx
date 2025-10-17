@@ -196,6 +196,7 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
   const [isLoading, setIsLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
   const [hasInitialQuery] = useState(!!args.query);
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
 
   // Fetch docs
   const {
@@ -278,6 +279,17 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
       return scoreB - scoreA; // Higher scores first
     });
 
+  // Auto-select first result when search results change
+  useEffect(() => {
+    if (filteredSections.length > 0) {
+      const firstItemId = filteredSections[0].title;
+      setSelectedItemId(firstItemId);
+      setShowDetail(true); // Auto-show detail view
+    } else {
+      setSelectedItemId(undefined);
+    }
+  }, [filteredSections]);
+
   return (
     <List
       isLoading={isLoading || isFetching}
@@ -290,11 +302,14 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
       }}
       searchBarPlaceholder="Search Svelte documentation..."
       isShowingDetail={showDetail}
+      selectedItemId={selectedItemId}
+      onSelectionChange={(id) => setSelectedItemId(id || undefined)}
       throttle
     >
       {filteredSections.map((section, index) => (
         <List.Item
           key={index}
+          id={section.title}
           title={section.title}
           subtitle={section.type}
           icon={{ source: getIcon(section.type), tintColor: getColor(section.type) }}
