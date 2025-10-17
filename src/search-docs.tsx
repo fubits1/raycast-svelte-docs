@@ -28,14 +28,31 @@ function isCacheValid(): boolean {
   return Date.now() < parseInt(expiry);
 }
 
-interface DocSection {
+export interface DocSection {
   title: string;
   content: string;
-  type: 'module' | 'keyword' | 'component' | 'concept' | 'config' | 'hook';
+  type:
+    | 'rune'
+    | 'directive'
+    | 'block'
+    | 'element'
+    | 'module'
+    | 'api'
+    | 'concept'
+    | 'config'
+    | 'migration'
+    | 'error'
+    | 'styling'
+    | 'testing'
+    | 'typescript'
+    | 'stores'
+    | 'context'
+    | 'lifecycle'
+    | 'legacy';
   keywords: string[];
 }
 
-function parseDocsText(text: string): DocSection[] {
+export function parseDocsText(text: string): DocSection[] {
   const sections: DocSection[] = [];
   const lines = text
     .replace(/(\[!NOTE\])/g, 'ℹ️')
@@ -51,22 +68,23 @@ function parseDocsText(text: string): DocSection[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Check if this is a heading (starts with #)
-    if (line.match(/^#{1,3}\s+/)) {
+    // Check if this is a main heading (starts with # but not ##)
+    if (line.match(/^#\s+/)) {
       // Save previous section
       if (currentSection && currentSection.title && contentLines.length > 0) {
         currentSection.content = contentLines.join('\n').trim();
+        currentSection.type = detectType(currentSection.title, currentSection.content);
         sections.push(currentSection as DocSection);
       }
 
       // Start new section
-      const title = line.replace(/^#{1,3}\s+/, '');
+      const title = line.replace(/^#\s+/, '');
       contentLines = [];
 
       currentSection = {
         title,
         content: '',
-        type: detectType(title),
+        type: 'concept', // Will be updated after content is parsed
         keywords: extractKeywords(title),
       };
     } else if (currentSection) {
@@ -77,29 +95,181 @@ function parseDocsText(text: string): DocSection[] {
   // Save last section
   if (currentSection && currentSection.title && contentLines.length > 0) {
     currentSection.content = contentLines.join('\n').trim();
+    currentSection.type = detectType(currentSection.title, currentSection.content);
     sections.push(currentSection as DocSection);
   }
 
   return sections;
 }
 
-function detectType(title: string): DocSection['type'] {
-  const lower = title.toLowerCase();
+export function detectType(title: string, content: string): DocSection['type'] {
+  // Analyze actual content patterns dynamically
+  const contentLower = content.toLowerCase();
+  const titleLower = title.toLowerCase();
 
-  if (lower.includes('$app') || lower.includes('@sveltejs') || lower.includes('import')) {
+  // Extract patterns from content
+  const hasCodeBlocks = contentLower.includes('```') || contentLower.includes('`');
+  const hasImports = contentLower.includes('import ') || contentLower.includes('from ');
+  const hasDollarSigns = contentLower.includes('$');
+  const hasBrackets = contentLower.includes('{') && contentLower.includes('}');
+  const hasAngleBrackets = contentLower.includes('<') && contentLower.includes('>');
+  const hasColons = contentLower.includes(':');
+  const hasParens = contentLower.includes('(') && contentLower.includes(')');
+
+  // Pattern-based classification
+  if (
+    hasDollarSigns &&
+    (contentLower.includes('$state') ||
+      contentLower.includes('$derived') ||
+      contentLower.includes('$effect') ||
+      contentLower.includes('$props') ||
+      contentLower.includes('$bindable') ||
+      contentLower.includes('$inspect') ||
+      contentLower.includes('$host'))
+  ) {
+    return 'rune';
+  }
+
+  if (
+    hasColons &&
+    (contentLower.includes('use:') ||
+      contentLower.includes('bind:') ||
+      contentLower.includes('transition:') ||
+      contentLower.includes('animate:') ||
+      contentLower.includes('style:') ||
+      contentLower.includes('class:') ||
+      contentLower.includes('in:') ||
+      contentLower.includes('out:'))
+  ) {
+    return 'directive';
+  }
+
+  if (hasBrackets && (contentLower.includes('{#') || contentLower.includes('{@'))) {
+    return 'block';
+  }
+
+  // Check for specific block patterns
+  if (
+    contentLower.includes('{#if') ||
+    contentLower.includes('{#each') ||
+    contentLower.includes('{#await') ||
+    contentLower.includes('{#key') ||
+    contentLower.includes('{#snippet') ||
+    contentLower.includes('{@render') ||
+    contentLower.includes('{@html') ||
+    contentLower.includes('{@attach') ||
+    contentLower.includes('{@const') ||
+    contentLower.includes('{@debug')
+  ) {
+    return 'block';
+  }
+
+  if (hasAngleBrackets && contentLower.includes('svelte:')) {
+    return 'element';
+  }
+
+  if (hasImports && (contentLower.includes('$app') || contentLower.includes('@sveltejs'))) {
     return 'module';
   }
-  if (lower.match(/^[a-z]+$/)) {
-    return 'keyword';
+
+  if (hasCodeBlocks && (contentLower.includes('function') || contentLower.includes('interface'))) {
+    return 'api';
   }
-  if (lower.includes('component') || lower.includes('element')) {
-    return 'component';
-  }
-  if (lower.includes('config') || lower.includes('adapter')) {
+
+  if (contentLower.includes('config') || contentLower.includes('adapter')) {
     return 'config';
   }
-  if (lower.includes('hook')) {
-    return 'hook';
+
+  if (contentLower.includes('migration') || contentLower.includes('upgrade')) {
+    return 'migration';
+  }
+
+  if (contentLower.includes('error') || contentLower.includes('warning')) {
+    return 'error';
+  }
+
+  // Check for styling patterns
+  if (
+    contentLower.includes('scoped styles') ||
+    contentLower.includes('global styles') ||
+    contentLower.includes('custom properties') ||
+    contentLower.includes('css') ||
+    contentLower.includes('style') ||
+    contentLower.includes('styling')
+  ) {
+    return 'styling';
+  }
+
+  // Check for testing patterns
+  if (
+    contentLower.includes('testing') ||
+    contentLower.includes('test') ||
+    contentLower.includes('vitest') ||
+    contentLower.includes('playwright') ||
+    contentLower.includes('unit test') ||
+    contentLower.includes('e2e')
+  ) {
+    return 'testing';
+  }
+
+  // Check for TypeScript patterns
+  if (
+    contentLower.includes('typescript') ||
+    contentLower.includes('tsconfig') ||
+    contentLower.includes('type safety') ||
+    contentLower.includes('interface') ||
+    contentLower.includes('generic') ||
+    contentLower.includes('jsconfig')
+  ) {
+    return 'typescript';
+  }
+
+  // Check for stores patterns
+  if (
+    contentLower.includes('stores') ||
+    contentLower.includes('writable') ||
+    contentLower.includes('readable') ||
+    contentLower.includes('derived store') ||
+    contentLower.includes('store') ||
+    contentLower.includes('reactive store')
+  ) {
+    return 'stores';
+  }
+
+  // Check for context patterns
+  if (
+    contentLower.includes('context') ||
+    contentLower.includes('setcontext') ||
+    contentLower.includes('getcontext') ||
+    contentLower.includes('context api')
+  ) {
+    return 'context';
+  }
+
+  // Check for lifecycle patterns
+  if (
+    contentLower.includes('lifecycle') ||
+    contentLower.includes('onmount') ||
+    contentLower.includes('ondestroy') ||
+    contentLower.includes('beforeupdate') ||
+    contentLower.includes('afterupdate') ||
+    contentLower.includes('tick')
+  ) {
+    return 'lifecycle';
+  }
+
+  // Check for legacy patterns
+  if (
+    contentLower.includes('legacy') ||
+    contentLower.includes('deprecated') ||
+    contentLower.includes('svelte 3') ||
+    contentLower.includes('svelte 4') ||
+    contentLower.includes('sapper') ||
+    contentLower.includes('export let') ||
+    contentLower.includes('reactive') ||
+    contentLower.includes('slot')
+  ) {
+    return 'legacy';
   }
 
   return 'concept';
@@ -114,16 +284,40 @@ function extractKeywords(title: string): string[] {
 
 function getIcon(type: DocSection['type']): Icon {
   switch (type) {
+    case 'rune':
+      return Icon.Bolt;
+    case 'directive':
+      return Icon.Code;
+    case 'block':
+      return Icon.Brackets;
+    case 'element':
+      return Icon.Tag;
     case 'module':
       return Icon.Box;
-    case 'keyword':
-      return Icon.Code;
-    case 'component':
-      return Icon.Layers;
+    case 'api':
+      return Icon.Terminal;
+    case 'concept':
+      return Icon.Book;
     case 'config':
       return Icon.Gear;
-    case 'hook':
-      return Icon.Link;
+    case 'migration':
+      return Icon.ArrowRight;
+    case 'error':
+      return Icon.ExclamationMark;
+    case 'styling':
+      return Icon.Paintbrush;
+    case 'testing':
+      return Icon.CheckCircle;
+    case 'typescript':
+      return Icon.Code;
+    case 'stores':
+      return Icon.Archive;
+    case 'context':
+      return Icon.Share;
+    case 'lifecycle':
+      return Icon.Clock;
+    case 'legacy':
+      return Icon.Clock;
     default:
       return Icon.Book;
   }
@@ -131,16 +325,40 @@ function getIcon(type: DocSection['type']): Icon {
 
 function getColor(type: DocSection['type']): Color {
   switch (type) {
+    case 'rune':
+      return Color.Orange;
+    case 'directive':
+      return Color.Purple;
+    case 'block':
+      return Color.Blue;
+    case 'element':
+      return Color.Green;
     case 'module':
       return Color.Blue;
-    case 'keyword':
-      return Color.Purple;
-    case 'component':
-      return Color.Orange;
+    case 'api':
+      return Color.SecondaryText;
+    case 'concept':
+      return Color.PrimaryText;
     case 'config':
       return Color.Green;
-    case 'hook':
+    case 'migration':
+      return Color.Orange;
+    case 'error':
       return Color.Red;
+    case 'styling':
+      return Color.Pink;
+    case 'testing':
+      return Color.Green;
+    case 'typescript':
+      return Color.Blue;
+    case 'stores':
+      return Color.Purple;
+    case 'context':
+      return Color.Yellow;
+    case 'lifecycle':
+      return Color.SecondaryText;
+    case 'legacy':
+      return Color.SecondaryText;
     default:
       return Color.PrimaryText;
   }
