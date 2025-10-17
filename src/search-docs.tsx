@@ -3,6 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useFetch } from '@raycast/utils';
 import { marked } from 'marked';
 
+interface Arguments {
+  query?: string;
+}
+
 const DOCS_URL = 'https://svelte.dev/llms-full.txt';
 const cache = new Cache();
 
@@ -16,15 +20,16 @@ interface DocSection {
 
 function parseDocsText(text: string): DocSection[] {
   const sections: DocSection[] = [];
-
-  // Use marked to parse the markdown and extract headers
-  const tokens = marked.lexer(text);
+  const lines = text.split('\n');
 
   let currentSection: Partial<DocSection> | null = null;
   let contentBuffer: string[] = [];
 
-  for (const token of tokens) {
-    if (token.type === 'heading' && token.depth <= 3) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Detect section headers (markdown headers)
+    if (line.startsWith('# ') && !line.includes('@sveltejs')) {
       // Save previous section
       if (currentSection && currentSection.title && contentBuffer.length > 0) {
         currentSection.content = contentBuffer.join('\n').trim();
@@ -32,7 +37,25 @@ function parseDocsText(text: string): DocSection[] {
       }
 
       // Start new section
-      const title = token.text;
+      const title = line.substring(2).trim();
+      contentBuffer = [];
+
+      currentSection = {
+        title,
+        content: '',
+        type: detectType(title),
+        url: generateUrl(title),
+        keywords: extractKeywords(title),
+      };
+    } else if (line.startsWith('## ') || line.startsWith('### ')) {
+      // Subsections - save as separate entries for better searchability
+      if (currentSection && currentSection.title && contentBuffer.length > 0) {
+        currentSection.content = contentBuffer.join('\n').trim();
+        sections.push(currentSection as DocSection);
+      }
+
+      const level = line.startsWith('## ') ? 2 : 3;
+      const title = line.substring(level + 1).trim();
       contentBuffer = [];
 
       currentSection = {
@@ -43,15 +66,8 @@ function parseDocsText(text: string): DocSection[] {
         keywords: extractKeywords(title),
       };
     } else if (currentSection) {
-      // Add content to current section
-      if (token.type === 'paragraph') {
-        contentBuffer.push(token.text);
-      } else if (token.type === 'code') {
-        contentBuffer.push(`\`\`\`${token.lang || ''}\n${token.text}\n\`\`\``);
-      } else if (token.type === 'list') {
-        const listItems = token.items.map((item: any) => `- ${item.text}`).join('\n');
-        contentBuffer.push(listItems);
-      }
+      // Add raw markdown content to preserve formatting
+      contentBuffer.push(line);
     }
   }
 
@@ -143,10 +159,43 @@ function getColor(type: DocSection['type']): Color {
   }
 }
 
-export default function Command() {
-  const [searchText, setSearchText] = useState('');
+function getMatchScore(section: DocSection, search: string): number {
+  let score = 0;
+
+  // Exact keyword match gets highest priority
+  if (section.keywords.some((k) => k === search)) {
+    score += 100;
+  }
+
+  // Keyword contains search gets high priority
+  if (section.keywords.some((k) => k.includes(search))) {
+    score += 50;
+  }
+
+  // Title exact match gets medium-high priority
+  if (section.title.toLowerCase() === search) {
+    score += 30;
+  }
+
+  // Title contains search gets medium priority
+  if (section.title.toLowerCase().includes(search)) {
+    score += 20;
+  }
+
+  // Content contains search gets low priority
+  if (section.content.toLowerCase().includes(search)) {
+    score += 10;
+  }
+
+  return score;
+}
+
+export default function Command({ arguments: args }: { arguments: Arguments }) {
+  const [searchText, setSearchText] = useState(args.query || '');
   const [sections, setSections] = useState<DocSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDetail, setShowDetail] = useState(false);
+  const [hasInitialQuery] = useState(!!args.query);
 
   // Fetch docs
   const {
@@ -205,23 +254,42 @@ export default function Command() {
     loadDocs();
   }, [data]);
 
-  // Filter sections based on search
-  const filteredSections = sections.filter((section) => {
-    if (!searchText) return true;
+  // Filter and sort sections based on search
+  const filteredSections = sections
+    .filter((section) => {
+      if (!searchText) return true;
 
-    const search = searchText.toLowerCase();
-    return (
-      section.title.toLowerCase().includes(search) ||
-      section.keywords.some((k) => k.includes(search)) ||
-      section.content.toLowerCase().includes(search)
-    );
-  });
+      const search = searchText.toLowerCase();
+      return (
+        section.title.toLowerCase().includes(search) ||
+        section.keywords.some((k) => k.includes(search)) ||
+        section.content.toLowerCase().includes(search)
+      );
+    })
+    .sort((a, b) => {
+      if (!searchText) return 0;
+
+      const search = searchText.toLowerCase();
+
+      // Score each section based on match type
+      const scoreA = getMatchScore(a, search);
+      const scoreB = getMatchScore(b, search);
+
+      return scoreB - scoreA; // Higher scores first
+    });
 
   return (
     <List
       isLoading={isLoading || isFetching}
-      onSearchTextChange={setSearchText}
+      onSearchTextChange={(text) => {
+        // Don't clear search text if we have an initial query and user hasn't typed anything
+        if (hasInitialQuery && text === '' && searchText === args.query) {
+          return;
+        }
+        setSearchText(text);
+      }}
       searchBarPlaceholder="Search Svelte documentation..."
+      isShowingDetail={showDetail}
       throttle
     >
       {filteredSections.map((section, index) => (
@@ -231,9 +299,16 @@ export default function Command() {
           subtitle={section.type}
           icon={{ source: getIcon(section.type), tintColor: getColor(section.type) }}
           accessories={[{ text: `${section.content.split('\n').length} lines` }]}
+          detail={<List.Item.Detail markdown={section.content} />}
           actions={
             <ActionPanel>
-              <Action.OpenInBrowser url={section.url} />
+              <Action
+                title={showDetail ? 'Hide Detail' : 'Show Detail'}
+                icon={showDetail ? Icon.EyeSlash : Icon.Eye}
+                onAction={() => setShowDetail(!showDetail)}
+                shortcut={{ modifiers: ['cmd'], key: 'd' }}
+              />
+              <Action.OpenInBrowser url={section.url} shortcut={{ modifiers: ['cmd'], key: 'b' }} />
               <Action.CopyToClipboard
                 title="Copy Content"
                 content={section.content}

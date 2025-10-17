@@ -19,6 +19,9 @@ declare namespace Preferences {
 
 declare namespace Arguments {
   /** Arguments passed to the `search-docs` command */
-  export type SearchDocs = {}
+  export type SearchDocs = {
+  /** Search Svelte docs... */
+  "query": string
+}
 }
 

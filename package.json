@@ -16,7 +16,16 @@
       "title": "Search Svelte Docs",
       "subtitle": "Svelte",
       "description": "Search Svelte and SvelteKit documentation",
-      "mode": "view"
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "Search Svelte docs...",
+          "type": "text",
+          "optional": true,
+          "default": ""
+        }
+      ]
     }
   ],
   "dependencies": {
