@@ -32,13 +32,18 @@ interface DocSection {
   title: string;
   content: string;
   type: 'module' | 'keyword' | 'component' | 'concept' | 'config' | 'hook';
-  url: string;
   keywords: string[];
 }
 
 function parseDocsText(text: string): DocSection[] {
   const sections: DocSection[] = [];
-  const lines = text.split('\n');
+  const lines = text
+    .replace(/(\[!NOTE\])/g, 'ℹ️')
+    .replace(/(\[!WARNING\])/g, '⚠️')
+    .replace(/(\[!TIP\])/g, '💡')
+    .replace(/(\[!IMPORTANT\])/g, '🔥')
+    .replace(/(\[!CAUTION\])/g, '🚨')
+    .split('\n');
 
   let currentSection: Partial<DocSection> | null = null;
   let contentLines: string[] = [];
@@ -62,7 +67,6 @@ function parseDocsText(text: string): DocSection[] {
         title,
         content: '',
         type: detectType(title),
-        url: generateUrl(title),
         keywords: extractKeywords(title),
       };
     } else if (currentSection) {
