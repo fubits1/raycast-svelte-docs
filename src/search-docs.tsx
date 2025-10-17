@@ -26,24 +26,25 @@ interface DocSection {
 
 function parseDocsText(text: string): DocSection[] {
   const sections: DocSection[] = [];
-
-  // Use marked to parse the markdown and extract headers
-  const tokens = marked.lexer(text);
+  const lines = text.split('\n');
 
   let currentSection: Partial<DocSection> | null = null;
-  let contentBuffer: string[] = [];
+  let contentLines: string[] = [];
 
-  for (const token of tokens) {
-    if (token.type === 'heading' && token.depth <= 3) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check if this is a heading (starts with #)
+    if (line.match(/^#{1,3}\s+/)) {
       // Save previous section
-      if (currentSection && currentSection.title && contentBuffer.length > 0) {
-        currentSection.content = contentBuffer.join('\n').trim();
+      if (currentSection && currentSection.title && contentLines.length > 0) {
+        currentSection.content = contentLines.join('\n').trim();
         sections.push(currentSection as DocSection);
       }
 
       // Start new section
-      const title = token.text;
-      contentBuffer = [];
+      const title = line.replace(/^#{1,3}\s+/, '');
+      contentLines = [];
 
       currentSection = {
         title,
@@ -53,27 +54,13 @@ function parseDocsText(text: string): DocSection[] {
         keywords: extractKeywords(title),
       };
     } else if (currentSection) {
-      // Add content to current section
-      if (token.type === 'paragraph') {
-        contentBuffer.push(token.text);
-      } else if (token.type === 'code') {
-        contentBuffer.push(`\`\`\`${token.lang || ''}\n${token.text}\n\`\`\``);
-      } else if (token.type === 'list') {
-        const listItems = token.items.map((item: any) => `- ${item.text}`).join('\n');
-        contentBuffer.push(listItems);
-      } else if (token.type === 'table') {
-        // Handle tables with GFM support
-        const tableMarkdown = marked.parser([token]);
-        contentBuffer.push(tableMarkdown);
-      } else if (token.type === 'blockquote') {
-        contentBuffer.push(`> ${token.text}`);
-      }
+      contentLines.push(line);
     }
   }
 
   // Save last section
-  if (currentSection && currentSection.title && contentBuffer.length > 0) {
-    currentSection.content = contentBuffer.join('\n').trim();
+  if (currentSection && currentSection.title && contentLines.length > 0) {
+    currentSection.content = contentLines.join('\n').trim();
     sections.push(currentSection as DocSection);
   }
 
