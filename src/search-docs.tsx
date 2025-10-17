@@ -289,7 +289,7 @@ function getIcon(type: DocSection['type']): Icon {
     case 'directive':
       return Icon.Code;
     case 'block':
-      return Icon.Brackets;
+      return Icon.Code;
     case 'element':
       return Icon.Tag;
     case 'module':
@@ -305,15 +305,15 @@ function getIcon(type: DocSection['type']): Icon {
     case 'error':
       return Icon.ExclamationMark;
     case 'styling':
-      return Icon.Paintbrush;
+      return Icon.Brush;
     case 'testing':
       return Icon.CheckCircle;
     case 'typescript':
       return Icon.Code;
     case 'stores':
-      return Icon.Archive;
+      return Icon.Box;
     case 'context':
-      return Icon.Share;
+      return Icon.Link;
     case 'lifecycle':
       return Icon.Clock;
     case 'legacy':
@@ -346,7 +346,7 @@ function getColor(type: DocSection['type']): Color {
     case 'error':
       return Color.Red;
     case 'styling':
-      return Color.Pink;
+      return Color.Magenta;
     case 'testing':
       return Color.Green;
     case 'typescript':
