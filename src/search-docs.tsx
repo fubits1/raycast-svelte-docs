@@ -293,16 +293,20 @@ export default function Command({ arguments: args }: { arguments: Arguments }) {
                 onAction={() => setShowDetail(!showDetail)}
                 shortcut={{ modifiers: ['cmd'], key: 'd' }}
               />
-              <Action.OpenInBrowser url={section.url} shortcut={{ modifiers: ['cmd'], key: 'b' }} />
               <Action.CopyToClipboard
                 title="Copy Content"
                 content={section.content}
                 shortcut={{ modifiers: ['cmd'], key: 'c' }}
               />
-              <Action.CopyToClipboard
-                title="Copy URL"
-                content={section.url}
-                shortcut={{ modifiers: ['cmd', 'shift'], key: 'c' }}
+              <Action
+                title="Refresh Docs"
+                icon={Icon.ArrowClockwise}
+                shortcut={{ modifiers: ['cmd'], key: 'r' }}
+                onAction={() => {
+                  cache.remove(CACHE_KEY);
+                  cache.remove(CACHE_EXPIRY_KEY);
+                  window.location.reload();
+                }}
               />
             </ActionPanel>
           }
